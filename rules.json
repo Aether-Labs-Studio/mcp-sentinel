@@ -1,0 +1,53 @@
+{
+  "blocked_tools": [],
+  "blocked_paths": [
+    "(?i)/etc/passwd",
+    "(?i)/etc/shadow",
+    "(?i)/etc/sudoers",
+    "(?i)/etc/hosts",
+    "(?i)/etc/ssh",
+    "(?i)/etc/cron",
+    "(?i)/etc/environment",
+    "(?i)/etc/profile",
+    "(?i)/private/etc",
+
+    "(?i)/proc/",
+
+    "(?i)\\.ssh",
+    "(?i)\\.gnupg",
+    "(?i)id_rsa",
+    "(?i)id_ed25519",
+    "(?i)id_ecdsa",
+    "(?i)id_dsa",
+    "(?i)\\.pem",
+    "(?i)\\.p12",
+    "(?i)\\.pfx",
+    "(?i)\\.key",
+
+    "(?i)\\.env",
+    "(?i)\\.aws",
+    "(?i)\\.azure",
+    "(?i)\\.kube",
+    "(?i)\\.docker",
+    "(?i)\\.npmrc",
+    "(?i)\\.pypirc",
+    "(?i)\\.netrc",
+    "(?i)\\.git-credentials",
+    "(?i)\\.vault-token",
+    "(?i)credentials\\.json",
+    "(?i)token\\.json",
+    "(?i)secrets\\.(yaml|yml|json)",
+    "(?i)terraform\\.tfvars",
+    "(?i)\\.tfstate",
+    "(?i)application_default_credentials",
+
+    "(?i)\\.bash_history",
+    "(?i)\\.zsh_history",
+    "(?i)\\.fish_history",
+    "(?i)\\.history",
+
+    "\\.\\.[/\\\\]",
+    "(?i)%2e%2e",
+    "(?i)%252e%252e"
+  ]
+}

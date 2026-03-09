@@ -1,0 +1,28 @@
+# Binaries
+bin/
+mcp-sentinel
+
+# Dependencies
+vendor/
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Tooling
+.gga-cache/
+.engram/
+.agent/
+.gga
+.gga-rules.md
+AGENT.md
+
+# Testing
+*.test
+*.prof
+*.out
+
+.claude

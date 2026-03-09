@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCP Sentinel CE — Live Monitor</title>
+<style>
+:root {
+  --bg: #0b1020;
+  --panel: #131a2a;
+  --border: #24304a;
+  --text: #e8eefc;
+  --muted: #98a4c0;
+  --green: #4ade80;
+  --red: #f87171;
+  --blue: #60a5fa;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(19,26,42,.95);
+  position: sticky;
+  top: 0;
+}
+.brand { font-weight: 700; }
+.stats { display: flex; gap: 16px; color: var(--muted); font-size: 14px; }
+main { max-width: 1100px; margin: 0 auto; padding: 20px; }
+.note { color: var(--muted); margin-bottom: 16px; }
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.row {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.top {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 4px 8px;
+}
+.inv { background: rgba(74,222,128,.14); color: var(--green); }
+.blk { background: rgba(248,113,113,.14); color: var(--red); }
+.ts, .reason { color: var(--muted); font-size: 13px; }
+.tool { color: var(--blue); font-weight: 600; }
+.empty {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  color: var(--muted);
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">MCP Sentinel CE — Live Monitor</div>
+  <div class="stats">
+    <span id="conn">Disconnected</span>
+    <span>INV <strong id="inv">0</strong></span>
+    <span>BLK <strong id="blk">0</strong></span>
+  </div>
+</header>
+<main>
+  <p class="note">Transparent local proxy telemetry. Only the first Sentinel process exposes live events in CE.</p>
+  <div id="feed" class="feed">
+    <div id="empty" class="empty">Waiting for live events…</div>
+  </div>
+</main>
+<script>
+(function () {
+  const feed = document.getElementById('feed');
+  const empty = document.getElementById('empty');
+  const conn = document.getElementById('conn');
+  const inv = document.getElementById('inv');
+  const blk = document.getElementById('blk');
+  let invCount = 0;
+  let blkCount = 0;
+
+  function esc(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function addEvent(event) {
+    if (empty.parentNode) empty.remove();
+    if (event.type === 'INVOCATION') {
+      invCount++;
+      inv.textContent = invCount;
+    } else if (event.type === 'BLOCK') {
+      blkCount++;
+      blk.textContent = blkCount;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = [
+      '<div class="top">',
+      '<span class="badge ' + (event.type === 'INVOCATION' ? 'inv' : 'blk') + '">' + esc(event.type) + '</span>',
+      '<span class="tool">' + esc(event.tool || '—') + '</span>',
+      '<span class="ts">' + esc(event.timestamp || '') + '</span>',
+      '</div>',
+      event.reason ? '<div class="reason">' + esc(event.reason) + '</div>' : ''
+    ].join('');
+    feed.insertBefore(row, feed.firstChild);
+  }
+
+  const es = new EventSource('/events');
+  es.onopen = function () { conn.textContent = 'Connected'; };
+  es.onerror = function () { conn.textContent = 'Disconnected'; };
+  es.onmessage = function (msg) {
+    try { addEvent(JSON.parse(msg.data)); } catch (_) {}
+  };
+})();
+</script>
+</body>
+</html>
