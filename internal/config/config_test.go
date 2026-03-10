@@ -104,6 +104,20 @@ func TestLoadSentinelConfig_TelemetryHubMode(t *testing.T) {
 	}
 }
 
+func TestLoadSentinelConfig_DefaultFilesystemRoot(t *testing.T) {
+	dir := t.TempDir()
+	writeTempConfig(t, dir, `{"default_filesystem_root": "/tmp/workspace"}`)
+
+	data, _ := os.ReadFile(filepath.Join(dir, "config.json"))
+	var cfg SentinelConfig
+	if err := unmarshalSentinelConfig(data, &cfg); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.DefaultFilesystemRoot != "/tmp/workspace" {
+		t.Errorf("expected default_filesystem_root=/tmp/workspace, got %q", cfg.DefaultFilesystemRoot)
+	}
+}
+
 func TestLoadRules_RejectsUnknownFields(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "rules.json")

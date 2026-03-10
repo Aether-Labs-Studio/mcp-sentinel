@@ -30,6 +30,7 @@ type Rules struct {
 // SentinelConfig holds user-level defaults read from ~/.sentinel/config.json.
 // All fields are optional — absent or malformed file results in zero-value struct.
 type SentinelConfig struct {
+	DefaultFilesystemRoot string `json:"default_filesystem_root,omitempty"`
 	TelemetryEnabled *bool  `json:"telemetry_enabled,omitempty"`
 	TelemetryHubMode string `json:"telemetry_hub_mode,omitempty"`
 }
