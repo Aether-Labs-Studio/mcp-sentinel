@@ -1,4 +1,5 @@
 {
+  "default_filesystem_root": "",
   "telemetry_enabled": true,
   "telemetry_hub_mode": "relay"
 }

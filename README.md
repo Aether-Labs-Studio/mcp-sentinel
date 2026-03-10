@@ -125,7 +125,7 @@ After installing the binary with Homebrew, you can run the installer in **config
 curl -fsSL https://raw.githubusercontent.com/Aether-Labs-Studio/mcp-sentinel/main/install.sh | SKIP_BINARY=1 sh
 ```
 
-The installer will ask which folder should be exposed by `@modelcontextprotocol/server-filesystem` before it tries to auto-configure any client.
+The installer will ask which folder should be exposed by `@modelcontextprotocol/server-filesystem` before it tries to auto-configure any client. In CE, that value is stored in `~/.sentinel/config.json` as `default_filesystem_root` and reused across client configs.
 
 ### Install with curl
 
@@ -142,7 +142,7 @@ Installer environment variables:
 | `VERSION=v1.0.0` | Install a specific release instead of the latest |
 | `INSTALL_DIR=/custom/bin` | Override the binary install directory |
 | `SENTINEL_DIR=/custom/sentinel` | Override the Sentinel config directory |
-| `FILESYSTEM_ROOT=/path/to/folder` | Root path to expose via `@modelcontextprotocol/server-filesystem` |
+| `FILESYSTEM_ROOT=/path/to/folder` | Root path stored in `~/.sentinel/config.json` as `default_filesystem_root` |
 | `MCP_CLIENTS=gemini,cursor,codex` | Non-interactive list of clients to auto-configure (`all` or `none` also supported) |
 | `YES=1` | Skip interactive confirmations |
 | `SKIP_BINARY=1` | Skip binary download and only configure clients / files |
@@ -299,6 +299,7 @@ Optional user defaults:
 
 ```json
 {
+  "default_filesystem_root": "/Users/you/your-project",
   "telemetry_enabled": true,
   "telemetry_hub_mode": "relay"
 }
@@ -308,6 +309,7 @@ Supported fields:
 
 | Field | Type | Meaning |
 |---|---:|---|
+| `default_filesystem_root` | `string` | Default directory appended to `@modelcontextprotocol/server-filesystem` when the client config omits an explicit root |
 | `telemetry_enabled` | `boolean` | Disable telemetry by default when set to `false` |
 | `telemetry_hub_mode` | `string` | Optional compatibility value: `relay`, `on_update`, `always_takeover` |
 
@@ -386,7 +388,7 @@ The installer can auto-detect and offer to configure these clients when present:
 - Codex
 
 Before auto-configuring any client, the installer asks for the folder to expose through `@modelcontextprotocol/server-filesystem`.
-That folder is appended to the child server command.
+That folder is stored once in `~/.sentinel/config.json` as `default_filesystem_root`, and Sentinel appends it automatically when launching `server-filesystem` without an explicit root argument.
 
 Then:
 
@@ -407,7 +409,7 @@ For clients that support stdio MCP servers through a JSON config, the core shape
   "mcpServers": {
     "sentinel": {
       "command": "mcp-sentinel",
-      "args": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/folder"]
+      "args": ["npx", "-y", "@modelcontextprotocol/server-filesystem"]
     }
   }
 }
@@ -419,7 +421,7 @@ For clients that support stdio MCP servers through a JSON config, the core shape
 
 ```bash
 claude mcp add --scope user sentinel -- mcp-sentinel \
-  npx -y @modelcontextprotocol/server-filesystem /path/to/folder
+  npx -y @modelcontextprotocol/server-filesystem
 ```
 
 #### Gemini CLI
@@ -432,7 +434,7 @@ claude mcp add --scope user sentinel -- mcp-sentinel \
     "sentinel": {
       "type": "stdio",
       "command": "mcp-sentinel",
-      "args": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/folder"],
+      "args": ["npx", "-y", "@modelcontextprotocol/server-filesystem"],
       "env": {}
     }
   }
@@ -449,7 +451,7 @@ claude mcp add --scope user sentinel -- mcp-sentinel \
     "sentinel": {
       "type": "stdio",
       "command": "mcp-sentinel",
-      "args": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/folder"],
+      "args": ["npx", "-y", "@modelcontextprotocol/server-filesystem"],
       "env": {}
     }
   }
@@ -465,7 +467,7 @@ claude mcp add --scope user sentinel -- mcp-sentinel \
   "servers": {
     "sentinel": {
       "command": "mcp-sentinel",
-      "args": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/folder"]
+      "args": ["npx", "-y", "@modelcontextprotocol/server-filesystem"]
     }
   }
 }
@@ -481,7 +483,7 @@ claude mcp add --scope user sentinel -- mcp-sentinel \
     "sentinel": {
       "type": "stdio",
       "command": "mcp-sentinel",
-      "args": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/folder"],
+      "args": ["npx", "-y", "@modelcontextprotocol/server-filesystem"],
       "env": {}
     }
   }
@@ -497,7 +499,7 @@ claude mcp add --scope user sentinel -- mcp-sentinel \
   "mcp": {
     "sentinel": {
       "type": "local",
-      "command": ["mcp-sentinel", "npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/folder"],
+      "command": ["mcp-sentinel", "npx", "-y", "@modelcontextprotocol/server-filesystem"],
       "enabled": true
     }
   }
@@ -511,7 +513,7 @@ claude mcp add --scope user sentinel -- mcp-sentinel \
 ```toml
 [mcp_servers.sentinel]
 command = "mcp-sentinel"
-args = ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/folder"]
+args = ["npx", "-y", "@modelcontextprotocol/server-filesystem"]
 ```
 
 ### Why Sentinel appears as the command

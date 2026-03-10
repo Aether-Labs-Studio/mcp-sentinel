@@ -13,7 +13,7 @@
 #    VERSION=v1.0.0   Install a specific version (default: latest)
 #    INSTALL_DIR=...  Override install directory (default: /usr/local/bin)
 #    FILESYSTEM_ROOT=...
-#                     Root path to expose through @modelcontextprotocol/server-filesystem
+#                     Root path stored in ~/.sentinel/config.json as default_filesystem_root
 #    YES=1            Skip all confirmation prompts (non-interactive / CI)
 #    SKIP_BINARY=1    Skip binary download (e.g. already installed via Homebrew)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -201,20 +201,28 @@ PYEOF
 # ── Config snippets ───────────────────────────────────────────────────────────
 print_claude_snippet() {
   local bin="$1" root="${2:-/path/to/folder}"
+  local server_args='npx -y @modelcontextprotocol/server-filesystem'
+  if [ "$root" = "/path/to/folder" ]; then
+    server_args="$server_args $root"
+  fi
   printf "\n    Run this to register Sentinel in Claude Code:\n\n"
   printf "    ${BOLD}claude mcp add --scope user sentinel -- %s \\\\\n" "$bin"
-  printf "      npx -y @modelcontextprotocol/server-filesystem %s${NC}\n\n" "$root"
+  printf "      %s${NC}\n\n" "$server_args"
 }
 
 print_generic_snippet() {
   local bin="$1" root="${2:-/path/to/folder}"
+  local args='["npx", "-y", "@modelcontextprotocol/server-filesystem"]'
+  if [ "$root" = "/path/to/folder" ]; then
+    args='["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/folder"]'
+  fi
   cat <<EOF
 
     {
       "mcpServers": {
         "sentinel": {
           "command": "$bin",
-          "args": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "$root"]
+          "args": $args
         }
       }
     }
@@ -224,13 +232,17 @@ EOF
 
 print_vscode_snippet() {
   local bin="$1" root="${2:-/path/to/folder}"
+  local args='["npx", "-y", "@modelcontextprotocol/server-filesystem"]'
+  if [ "$root" = "/path/to/folder" ]; then
+    args='["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/folder"]'
+  fi
   cat <<EOF
 
     {
       "servers": {
         "sentinel": {
           "command": "$bin",
-          "args": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "$root"]
+          "args": $args
         }
       }
     }
@@ -240,13 +252,17 @@ EOF
 
 print_opencode_snippet() {
   local bin="$1" root="${2:-/path/to/folder}"
+  local cmd="[\"$bin\", \"npx\", \"-y\", \"@modelcontextprotocol/server-filesystem\"]"
+  if [ "$root" = "/path/to/folder" ]; then
+    cmd="[\"$bin\", \"npx\", \"-y\", \"@modelcontextprotocol/server-filesystem\", \"/path/to/folder\"]"
+  fi
   cat <<EOF
 
     {
       "mcp": {
         "sentinel": {
           "type": "local",
-          "command": ["$bin", "npx", "-y", "@modelcontextprotocol/server-filesystem", "$root"],
+          "command": $cmd,
           "enabled": true
         }
       }
@@ -257,11 +273,15 @@ EOF
 
 print_codex_snippet() {
   local bin="$1" root="${2:-/path/to/folder}"
+  local args='["npx", "-y", "@modelcontextprotocol/server-filesystem"]'
+  if [ "$root" = "/path/to/folder" ]; then
+    args='["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/folder"]'
+  fi
   cat <<EOF
 
     [mcp_servers.sentinel]
     command = "$bin"
-    args = ["npx", "-y", "@modelcontextprotocol/server-filesystem", "$root"]
+    args = $args
 
 EOF
 }
@@ -274,6 +294,7 @@ prompt_filesystem_root() {
 
   if [ -e /dev/tty ]; then
     printf "  Enter the folder to expose via @modelcontextprotocol/server-filesystem\n" >/dev/tty
+    printf "  Sentinel CE will store it in ~/.sentinel/config.json as default_filesystem_root.\n" >/dev/tty
     printf "  Leave blank to skip auto-config and get manual config examples instead.\n\n" >/dev/tty
     printf "  Filesystem root: " >/dev/tty
     read -r FILESYSTEM_ROOT </dev/tty || FILESYSTEM_ROOT=""
@@ -284,6 +305,72 @@ prompt_filesystem_root() {
     fi
   else
     info "No TTY available and FILESYSTEM_ROOT not set — auto-config will be skipped"
+  fi
+}
+
+update_sentinel_config() {
+  [ -z "$FILESYSTEM_ROOT" ] && return 0
+
+  local config_path="$SENTINEL_DIR/config.json"
+  mkdir -p "$SENTINEL_DIR"
+
+  command -v python3 >/dev/null 2>&1 || return 1
+
+  python3 - "$config_path" "$FILESYSTEM_ROOT" <<'PYEOF'
+import sys, json, os
+path, default_filesystem_root = sys.argv[1], sys.argv[2]
+
+if os.path.exists(path):
+    with open(path) as f:
+        try:
+            data = json.load(f)
+        except json.JSONDecodeError:
+            print(f"  Warning: {path} contains invalid JSON — skipping.", file=sys.stderr)
+            sys.exit(1)
+else:
+    data = {"telemetry_enabled": True, "telemetry_hub_mode": "relay"}
+
+data["default_filesystem_root"] = default_filesystem_root
+
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PYEOF
+}
+
+ensure_sentinel_defaults() {
+  mkdir -p "$SENTINEL_DIR"
+
+  if [ ! -f "$SENTINEL_DIR/rules.json" ]; then
+    if [ -f "./rules.json" ]; then
+      cp "./rules.json" "$SENTINEL_DIR/rules.json"
+      success "Rules installed → $SENTINEL_DIR/rules.json"
+    else
+      local base_url="https://github.com/$REPO/releases/download/$(get_version)"
+      info "Downloading rules.json..."
+      download "${base_url}/rules.json" "$SENTINEL_DIR/rules.json"
+      success "Rules installed → $SENTINEL_DIR/rules.json"
+    fi
+  else
+    info "rules.json already exists — skipping (your customizations are safe)"
+  fi
+
+  if [ ! -f "$SENTINEL_DIR/config.json" ]; then
+    if [ -f "./config.json" ]; then
+      cp "./config.json" "$SENTINEL_DIR/config.json"
+      success "Config installed → $SENTINEL_DIR/config.json"
+    else
+      local base_url="https://github.com/$REPO/releases/download/$(get_version)"
+      info "Downloading config.json..."
+      download "${base_url}/config.json" "$SENTINEL_DIR/config.json"
+      success "Config installed → $SENTINEL_DIR/config.json"
+    fi
+  fi
+
+  if update_sentinel_config; then
+    success "Config updated → $SENTINEL_DIR/config.json (default_filesystem_root)"
+  else
+    warn "Could not update $SENTINEL_DIR/config.json with default_filesystem_root"
   fi
 }
 
@@ -539,20 +626,21 @@ configure_clients() {
   configured=0
 
   prompt_filesystem_root
+  ensure_sentinel_defaults
 
   local sentinel_args
-  sentinel_args=$(printf '["npx","-y","@modelcontextprotocol/server-filesystem","%s"]' "$FILESYSTEM_ROOT")
+  sentinel_args=$(printf '["npx","-y","@modelcontextprotocol/server-filesystem"]')
   local sentinel_entry
   sentinel_entry=$(printf '{"type":"stdio","command":"%s","args":%s,"env":{}}' "$binary_path" "$sentinel_args")
   local vscode_entry
   vscode_entry=$(printf '{"command":"%s","args":%s}' "$binary_path" "$sentinel_args")
   local opencode_cmd
-  opencode_cmd=$(printf '["%s","npx","-y","@modelcontextprotocol/server-filesystem","%s"]' "$binary_path" "$FILESYSTEM_ROOT")
+  opencode_cmd=$(printf '["%s","npx","-y","@modelcontextprotocol/server-filesystem"]' "$binary_path")
   local opencode_entry
   opencode_entry=$(printf '{"type":"local","command":%s,"enabled":true}' "$opencode_cmd")
 
   if [ -z "$FILESYSTEM_ROOT" ]; then
-    print_manual_client_examples "$binary_path"
+    print_manual_client_examples "$binary_path" "$FILESYSTEM_ROOT"
     return 0
   fi
 
@@ -766,7 +854,7 @@ PYEOF
 
 [mcp_servers.sentinel]
 command = "$binary_path"
-args = ["npx", "-y", "@modelcontextprotocol/server-filesystem", "$FILESYSTEM_ROOT"]
+args = ["npx", "-y", "@modelcontextprotocol/server-filesystem"]
 TOML
       success "Codex configured → $codex_config"
       configured=$((configured + 1))
@@ -789,7 +877,7 @@ TOML
   if [ "$configured" -eq 0 ]; then
     printf "\n  No MCP clients auto-configured.\n"
     printf "  Add Sentinel manually to your MCP client config:\n"
-    print_generic_snippet "$binary_path"
+    print_manual_client_examples "$binary_path" "$FILESYSTEM_ROOT"
   fi
 }
 
@@ -842,23 +930,7 @@ main() {
   fi
 
   # ── ~/.sentinel/ setup ────────────────────────────────────────────────────
-  mkdir -p "$SENTINEL_DIR"
-
-  if [ "$SKIP_BINARY" != "1" ]; then
-    local base_url="https://github.com/$REPO/releases/download/$(get_version)"
-    if [ ! -f "$SENTINEL_DIR/rules.json" ]; then
-      info "Downloading rules.json..."
-      download "${base_url}/rules.json" "$SENTINEL_DIR/rules.json"
-      success "Rules installed → $SENTINEL_DIR/rules.json"
-    else
-      info "rules.json already exists — skipping (your customizations are safe)"
-    fi
-
-    if [ ! -f "$SENTINEL_DIR/config.json" ]; then
-      download "${base_url}/config.json" "$SENTINEL_DIR/config.json"
-      success "Config installed → $SENTINEL_DIR/config.json"
-    fi
-  fi
+  ensure_sentinel_defaults
 
   # ── Configure MCP clients ─────────────────────────────────────────────────
   configure_clients
@@ -866,8 +938,9 @@ main() {
   # ── Done ──────────────────────────────────────────────────────────────────
   printf "\n  ${GREEN}${BOLD}✅ MCP Sentinel ${version:-$(command -v $BINARY)} configured successfully!${NC}\n\n"
   printf "  Next steps:\n"
-  printf "    1. Edit ${BOLD}~/.sentinel/rules.json${NC}  — customize security rules\n"
-  printf "    2. Open ${BOLD}http://127.0.0.1:7438${NC}   — Live Monitor (while Sentinel is running)\n\n"
+  printf "    1. Edit ${BOLD}~/.sentinel/config.json${NC} — set default_filesystem_root for server-filesystem\n"
+  printf "    2. Edit ${BOLD}~/.sentinel/rules.json${NC}  — customize security rules\n"
+  printf "    3. Open ${BOLD}http://127.0.0.1:7438${NC}   — Live Monitor (while Sentinel is running)\n\n"
   printf "  Documentation: https://github.com/$REPO\n\n"
 }
 

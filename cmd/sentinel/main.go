@@ -107,6 +107,24 @@ func resolveCmd(name string) string {
 	return name // last resort: exec.Command will emit the appropriate error if it doesn't exist
 }
 
+func applyDefaultFilesystemRoot(subArgs []string, root string) []string {
+	root = strings.TrimSpace(root)
+	if root == "" {
+		return subArgs
+	}
+	for i, arg := range subArgs {
+		if arg != "@modelcontextprotocol/server-filesystem" {
+			continue
+		}
+		if i == len(subArgs)-1 {
+			logx.Debugf("sentinel: appending default_filesystem_root to server-filesystem → %s", root)
+			return append(subArgs, root)
+		}
+		return subArgs
+	}
+	return subArgs
+}
+
 func main() {
 	// Golden Rule: all observability output goes exclusively to stderr.
 	log.SetOutput(os.Stderr)
@@ -118,11 +136,13 @@ func main() {
 	}
 
 	hubModeRaw := hubModeFlag
+	defaultFilesystemRoot := ""
 
 	// Load user defaults from ~/.sentinel/config.json (optional).
 	if sentinelCfg, err := config.LoadSentinelConfig(); err != nil {
 		log.Printf("sentinel: WARNING — %v (skipping config.json)", err)
 	} else {
+		defaultFilesystemRoot = sentinelCfg.DefaultFilesystemRoot
 		// Precedence: explicit --disable-telemetry flag wins over config.
 		if !disableTelemetry && sentinelCfg.TelemetryEnabled != nil && !*sentinelCfg.TelemetryEnabled {
 			disableTelemetry = true
@@ -134,6 +154,7 @@ func main() {
 			logx.Debugf("sentinel: telemetry hub mode from ~/.sentinel/config.json: %s", hubModeRaw)
 		}
 	}
+	subArgs = applyDefaultFilesystemRoot(subArgs, defaultFilesystemRoot)
 
 	hubMode, err := telemetry.ParseHubMode(hubModeRaw)
 	if err != nil {

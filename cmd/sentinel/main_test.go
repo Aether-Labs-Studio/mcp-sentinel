@@ -118,6 +118,30 @@ func TestResolveCmd_UnknownCommand(t *testing.T) {
 	}
 }
 
+func TestApplyDefaultFilesystemRoot_AppendsWhenMissing(t *testing.T) {
+	args := []string{"npx", "-y", "@modelcontextprotocol/server-filesystem"}
+	got := applyDefaultFilesystemRoot(args, "/tmp/project")
+	if len(got) != 4 || got[3] != "/tmp/project" {
+		t.Fatalf("expected root appended, got %v", got)
+	}
+}
+
+func TestApplyDefaultFilesystemRoot_DoesNotAppendWhenAlreadyPresent(t *testing.T) {
+	args := []string{"npx", "-y", "@modelcontextprotocol/server-filesystem", "/tmp/project"}
+	got := applyDefaultFilesystemRoot(args, "/tmp/other")
+	if len(got) != 4 || got[3] != "/tmp/project" {
+		t.Fatalf("expected explicit root preserved, got %v", got)
+	}
+}
+
+func TestApplyDefaultFilesystemRoot_IgnoresOtherCommands(t *testing.T) {
+	args := []string{"node", "server.js"}
+	got := applyDefaultFilesystemRoot(args, "/tmp/project")
+	if len(got) != 2 {
+		t.Fatalf("expected args unchanged, got %v", got)
+	}
+}
+
 func TestResolveRulesPath_ExplicitAlwaysWins(t *testing.T) {
 	path, err := resolveRulesPath("/some/explicit/rules.json")
 	if err != nil {
